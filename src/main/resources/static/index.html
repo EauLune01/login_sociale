@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth2 + JWT 로그인 테스트</title>
+    <style>
+        body {
+          font-family: 'Segoe UI', sans-serif;
+          text-align: center;
+          margin-top: 80px;
+        }
+        h1 { font-size: 26px; margin-bottom: 20px; }
+        .btn {
+          display: inline-block;
+          width: 220px;
+          padding: 12px 16px;
+          margin: 6px;
+          border-radius: 6px;
+          border: none;
+          font-size: 15px;
+          cursor: pointer;
+          transition: transform 0.1s ease-in-out;
+          color: #fff;
+        }
+        .btn:hover { transform: scale(1.03); }
+
+        .google   { background-color: #DB4437; }
+        .naver    { background-color: #1EC800; }
+        .kakao    { background-color: #FEE500; color: #3C1E1E; }
+        .facebook { background-color: #1877F2; }
+        .action   { background-color: #444; }
+
+        .status {
+          margin-top: 40px;
+          font-size: 14px;
+          color: #555;
+          white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+
+<h1>OAuth2 로그인 테스트 (Google / Naver / Kakao / Facebook)</h1>
+
+<div>
+    <a href="/oauth2/authorization/google"><button class="btn google">Google 로그인</button></a>
+    <a href="/oauth2/authorization/naver"><button class="btn naver">Naver 로그인</button></a>
+    <a href="/oauth2/authorization/kakao"><button class="btn kakao">Kakao 로그인</button></a>
+    <a href="/oauth2/authorization/facebook"><button class="btn facebook">Facebook 로그인</button></a>
+</div>
+
+<hr style="margin: 30px 0; width: 60%;">
+
+<div>
+    <button class="btn action" onclick="reissueToken()">🔄 토큰 재발급</button>
+    <button class="btn action" onclick="logout()">🚪 로그아웃</button>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+    window.onload = function() {
+      showStatus();
+    };
+
+    function showStatus() {
+      const accessToken = localStorage.getItem('accessToken');
+      const refreshToken = localStorage.getItem('refreshToken');
+      const statusEl = document.getElementById('status');
+
+      if (accessToken && refreshToken) {
+        statusEl.innerText =
+          '✅ 로그인 상태\n\n' +
+          'Access Token: ' + accessToken.substring(0, 25) + '...\n' +
+          'Refresh Token: ' + refreshToken.substring(0, 25) + '...';
+      } else {
+        statusEl.innerText = '🔒 현재 로그아웃 상태입니다.';
+      }
+    }
+
+    async function reissueToken() {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) {
+        alert('Refresh Token이 없습니다. 먼저 로그인하세요.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/auth/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+
+        const result = await response.json();
+        if (response.ok && result.success && result.data) {
+          const { accessToken: newAccess, refreshToken: newRefresh } = result.data;
+          localStorage.setItem('accessToken', newAccess);
+          localStorage.setItem('refreshToken', newRefresh);
+          alert('🔄 토큰 재발급 성공!');
+          showStatus();
+        } else {
+          alert('❌ 재발급 실패: ' + (result.message || '서버 오류'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('재발급 요청 중 오류가 발생했습니다.');
+      }
+    }
+
+    async function logout() {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        alert('이미 로그아웃 상태입니다.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+
+        if (response.ok) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          alert('🚪 로그아웃 완료!');
+          showStatus();
+        } else {
+          alert('❌ 로그아웃 실패');
+        }
+      } catch (err) {
+        console.error(err);
+        alert('로그아웃 중 오류가 발생했습니다.');
+      }
+    }
+</script>
+
+</body>
+</html>
