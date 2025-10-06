@@ -50,9 +50,6 @@ public class AuthController {
         if (authorization != null && authorization.startsWith("Bearer ")) {
             accessToken = authorization.substring(7);
         }
-        // ✅ 로그 추가
-        log.info("📢 Authorization Header: {}", authorization);
-        log.info("📢 Extracted Access Token: {}", accessToken);
 
         TokenResponse tokenResponse = authService.reissueTokens(
                 accessToken, request.getRefreshToken()
