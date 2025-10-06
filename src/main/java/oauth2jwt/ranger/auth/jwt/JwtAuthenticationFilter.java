@@ -8,35 +8,48 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import oauth2jwt.ranger.dto.global.response.ApiResponse;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import java.util.List;
 import java.io.IOException;
 
 import static oauth2jwt.ranger.auth.jwt.JwtConstants.HEADER_STRING;
 import static oauth2jwt.ranger.auth.jwt.JwtConstants.TOKEN_PREFIX;
 
-@Slf4j
 @RequiredArgsConstructor
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisTemplate<String, String> redisTemplate;
+    private final AuthenticationEntryPoint entryPoint; // 전역 EntryPoint 주입
+
+    private static final List<AntPathRequestMatcher> SKIP_MATCHERS = List.of(
+            new AntPathRequestMatcher("/auth/refresh"),
+            new AntPathRequestMatcher("/auth/callback.html"),
+            new AntPathRequestMatcher("/swagger-ui/**"),
+            new AntPathRequestMatcher("/v3/api-docs/**"),
+            new AntPathRequestMatcher("/redis/ping"),
+            new AntPathRequestMatcher("/")
+    );
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
+        return SKIP_MATCHERS.stream().anyMatch(m -> m.matches(request));
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain)
             throws ServletException, IOException {
-
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            chain.doFilter(request, response);
-            return;
-        }
 
         String token = resolveToken(request);
 
@@ -46,34 +59,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-            // 1. 로그아웃된 토큰(블랙리스트) 확인
+            // 블랙리스트(로그아웃 토큰)
             if (Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + token))) {
-                log.warn("JWT ✗ blacklisted token → 401");
-                unauthorized(response, "로그아웃된 토큰입니다.");
+                entryPoint.commence(request, response,
+                        new org.springframework.security.core.AuthenticationException("로그아웃된 사용자입니다.") {});
                 return;
             }
 
-            // 2. 토큰 유효성 검사
+            // 유효성 검사
             if (jwtTokenProvider.validateToken(token)) {
-                Authentication authentication = jwtTokenProvider.getAuthentication(token);
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.debug("JWT ✓ authenticated as {}", authentication.getName());
+                Authentication auth = jwtTokenProvider.getAuthentication(token);
+                SecurityContextHolder.getContext().setAuthentication(auth);
             } else {
                 SecurityContextHolder.clearContext();
-                unauthorized(response, "유효하지 않은 토큰입니다.");
+                entryPoint.commence(request, response,
+                        new org.springframework.security.core.AuthenticationException("유효하지 않은 토큰입니다.") {});
                 return;
             }
 
         } catch (JwtException | IllegalArgumentException e) {
             SecurityContextHolder.clearContext();
-            unauthorized(response, "JWT 오류: " + e.getMessage());
+            entryPoint.commence(request, response,
+                    new org.springframework.security.core.AuthenticationException("JWT 오류: " + e.getMessage()) {});
             return;
         }
 
         chain.doFilter(request, response);
     }
 
-    /** Authorization: Bearer <token> 형태에서 토큰만 추출 */
+    /** Authorization: Bearer <token> 에서 토큰만 추출 */
     private String resolveToken(HttpServletRequest request) {
         String bearer = request.getHeader(HEADER_STRING);
         if (StringUtils.hasText(bearer) && bearer.startsWith(TOKEN_PREFIX)) {
@@ -81,13 +95,4 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         return null;
     }
-
-    /** 공통 401 응답 메서드 */
-    private static void unauthorized(HttpServletResponse response, String msg) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setContentType("application/json;charset=UTF-8");
-        new ObjectMapper().writeValue(response.getWriter(),
-                new ApiResponse<>(false, 401, msg));
-    }
-
 }
