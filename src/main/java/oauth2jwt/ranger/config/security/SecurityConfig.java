@@ -77,8 +77,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                // CORS
-                .cors(withDefaults())
+                // CORS 설정을 WebConfig에 완전히 위임하기 위해 비활성화
+                .cors(c -> c.disable())
 
                 // 기본 인증/CSRF/폼/로그아웃 비활성화
                 .httpBasic(h -> h.disable())
@@ -87,8 +87,9 @@ public class SecurityConfig {
                 .logout(l -> l.disable())
                 .anonymous(withDefaults())
 
-                // OAuth2 플로우에 한해 세션 필요 → IF_REQUIRED
-                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                // 세션 STATELESS 설정 (아주 중요!)
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
 
                 // 요청별 권한
                 .authorizeHttpRequests(auth -> auth

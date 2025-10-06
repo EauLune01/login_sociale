@@ -37,6 +37,13 @@ public class User implements UserDetails {
         this.refreshToken = refreshToken;
     }
 
+    // [추가] 토큰에서 stateless 유저 객체를 생성하기 위한 생성자
+    public User(Long id, String username) {
+        this.id = id;
+        this.name = username;
+        this.role = Role.ROLE_USER;
+    }
+
     // === UserDetails 구현 ===
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
