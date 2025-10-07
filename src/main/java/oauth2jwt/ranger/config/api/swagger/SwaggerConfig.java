@@ -10,9 +10,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @OpenAPIDefinition(
         info = @Info(
-                title = "Toilet API",
+                title = "Ranger API",
                 version = "v1",
-                description = "Toilet 프로젝트 API 문서"
+                description = "소셜 로그인 + JWT 프로젝트 API 문서"
         )
 )
 public class SwaggerConfig {

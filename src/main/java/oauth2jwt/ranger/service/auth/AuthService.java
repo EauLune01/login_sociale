@@ -58,8 +58,6 @@ public class AuthService {
         return TokenResponse.of(newAccessToken, newRefreshToken);
     }
 
-
-
     public void logout(User user, String accessToken) {
         if (user == null) {
             throw new UnauthorizedException("로그인이 필요합니다.");

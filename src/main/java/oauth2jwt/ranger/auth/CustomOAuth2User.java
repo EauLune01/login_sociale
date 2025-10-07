@@ -1,5 +1,6 @@
 package oauth2jwt.ranger.auth;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import oauth2jwt.ranger.domain.user.User;
 import org.springframework.security.core.GrantedAuthority;
@@ -11,15 +12,11 @@ import java.util.Collections;
 import java.util.Map;
 
 @Getter
+@AllArgsConstructor
 public class CustomOAuth2User implements OAuth2User {
 
     private final User user;
     private final Map<String, Object> attributes;
-
-    public CustomOAuth2User(User user, Map<String, Object> attributes) {
-        this.user = user;
-        this.attributes = attributes;
-    }
 
     @Override
     public String getName() {

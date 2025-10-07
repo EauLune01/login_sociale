@@ -1,4 +1,4 @@
-package hwalibo.toilet.config;
+package oauth2jwt.ranger.config.redis;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
