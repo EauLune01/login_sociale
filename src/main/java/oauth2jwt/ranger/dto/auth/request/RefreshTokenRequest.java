@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+@Getter
+@NoArgsConstructor
 @Schema(name = "RefreshTokenRequest", description = "리프레시 토큰 재발급 요청 바디")
 public class RefreshTokenRequest {
 

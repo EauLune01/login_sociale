@@ -21,7 +21,12 @@ public class User implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name; // 사용자 이름 (nickname)
+    @Column(nullable = false, unique = true)
+    private String username; // "provider_providerId" 형식의 고유 식별자
+
+    @Column(unique = true)
+    private String name; // 사용자 이름 (또는 nickname)
+    @Column(unique = true)
     private String email; // 이메일
     private String provider; // OAuth2 제공자 (google, kakao, naver)
     private String providerId; // 제공자별 고유 ID
@@ -38,9 +43,9 @@ public class User implements UserDetails {
     }
 
     // [추가] 토큰에서 stateless 유저 객체를 생성하기 위한 생성자
-    public User(Long id, String username) {
+    public User(Long id, String name) {
         this.id = id;
-        this.name = username;
+        this.name = name;
         this.role = Role.ROLE_USER;
     }
 
@@ -51,7 +56,7 @@ public class User implements UserDetails {
     }
 
     @Override public String getPassword() { return null; } // OAuth2는 비밀번호 없음
-    @Override public String getUsername() { return provider + "_" + providerId; }
+    @Override public String getUsername() {return this.username;}
     @Override public boolean isAccountNonExpired() { return true; }
     @Override public boolean isAccountNonLocked() { return true; }
     @Override public boolean isCredentialsNonExpired() { return true; }

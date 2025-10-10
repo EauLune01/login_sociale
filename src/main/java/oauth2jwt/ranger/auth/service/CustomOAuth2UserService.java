@@ -52,14 +52,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     // 신규 유저 저장
     private User saveNewUser(OAuth2UserInfo oAuth2UserInfo) {
+        String username = oAuth2UserInfo.getProvider() + "_" + oAuth2UserInfo.getProviderId();
         User newUser = User.builder()
+                .username(username)
                 .name(oAuth2UserInfo.getName())
                 .email(oAuth2UserInfo.getEmail())
                 .provider(oAuth2UserInfo.getProvider())
                 .providerId(oAuth2UserInfo.getProviderId())
                 .role(Role.ROLE_USER)
                 .build();
-
         return userRepository.save(newUser);
     }
 }
