@@ -5,6 +5,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import oauth2jwt.ranger.auth.CustomOAuth2User;
+import oauth2jwt.ranger.domain.role.Role;
 import oauth2jwt.ranger.domain.user.User;
 import oauth2jwt.ranger.exception.auth.InvalidTokenException;
 import oauth2jwt.ranger.repository.user.UserRepository;
@@ -80,11 +81,12 @@ public class JwtTokenProvider {
                         .map(SimpleGrantedAuthority::new)
                         .collect(Collectors.toList());
 
-        // User.java에 추가한 생성자를 사용하여 객체 생성
-        User principal = new User(
-                Long.parseLong(claims.getSubject()),      // subject에서 User ID 추출
-                claims.get("username", String.class)  // 'username' 클레임에서 이름 추출
-        );
+        User principal = User.builder()
+                .id(Long.parseLong(claims.getSubject()))
+                .username(claims.get("username", String.class))
+                .name(claims.get("name", String.class))
+                .role(Role.valueOf((String) authorities.iterator().next().getAuthority()))
+                .build();
 
         return new UsernamePasswordAuthenticationToken(principal, token, authorities);
     }
