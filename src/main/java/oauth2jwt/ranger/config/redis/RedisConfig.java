@@ -11,6 +11,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
+    //local일 때 (배포 시 배포될 이름으로 수정해주기!)
     @Value("${REDIS_HOST:localhost}")
     private String redisHost;
 

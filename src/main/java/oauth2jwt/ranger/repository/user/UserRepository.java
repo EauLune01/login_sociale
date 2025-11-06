@@ -12,4 +12,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // 토큰 재발급 시 사용
     Optional<User> findByRefreshToken(String refreshToken);
+
 }

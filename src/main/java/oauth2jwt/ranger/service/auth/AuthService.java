@@ -27,6 +27,7 @@ public class AuthService {
     private final RedisTemplate<String, String> redisTemplate;
 
     //토큰 재발급
+    @Transactional
     public TokenResponse reissueTokens(String accessToken, String refreshToken) {
 
         String keyToCheck = "blacklist:" + accessToken;
