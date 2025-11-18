@@ -25,34 +25,30 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RedisTemplate<String, String> redisTemplate;
+    private final SocialUnlinkService socialUnlinkService;
 
     //토큰 재발급
     public TokenResponse reissueTokens(String accessToken, String refreshToken) {
 
-        String keyToCheck = "blacklist:" + accessToken;
-
-        boolean isBlacklisted = (accessToken != null && Boolean.TRUE.equals(redisTemplate.hasKey(keyToCheck)));
-
-        // 1. Access Token이 전달되었고 블랙리스트라면 거부
-        if (isBlacklisted) {
+        // 예외 처리
+        if (accessToken != null && isBlacklisted(accessToken)) {
             throw new UnauthorizedException("로그아웃된 사용자입니다.");
         }
 
-        // 2. Refresh Token 유효성 검증
+        // 1. Refresh Token 유효성 검증
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new InvalidTokenException("유효하지 않은 Refresh Token 입니다.");
         }
 
-        // 3. DB에서 해당 Refresh Token을 가진 사용자를 찾음
+        // 2. DB에서 유저 조회
         User user = userRepository.findByRefreshToken(refreshToken)
                 .orElseThrow(() -> new TokenNotFoundException("저장소에 Refresh Token이 존재하지 않습니다."));
 
-        // 4. 새로운 토큰들을 생성
-        Authentication authentication = jwtTokenProvider.getAuthenticationFromUser(user);
-        String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
+        // 3. 새 토큰 생성
+        String newAccessToken = jwtTokenProvider.createAccessToken(jwtTokenProvider.getAuthenticationFromUser(user));
         String newRefreshToken = jwtTokenProvider.createRefreshToken();
 
-        // 5. DB에 새로운 Refresh Token 저장 (Rotation)
+        // 4. DB 업데이트 (Rotation)
         user.updateRefreshToken(newRefreshToken);
 
         return TokenResponse.of(newAccessToken, newRefreshToken);
@@ -62,24 +58,66 @@ public class AuthService {
         if (user == null) {
             throw new UnauthorizedException("로그인이 필요합니다.");
         }
-        // 1. DB에서 리프레시 토큰 삭제
+
+        // 1. DB에서 Refresh Token 삭제
         user.updateRefreshToken(null);
 
-        // 2. Redis에 블랙리스트 등록
-        // JwtTokenProvider가 이미 계산해준 "남은 시간"을 그대로 사용
-        long remainingMillis = jwtTokenProvider.getRemainingTime(accessToken);
+        // 2. Access Token 블랙리스트 등록
+        // ✅ 복잡한 시간 계산/저장 로직을 헬퍼 메서드로 위임
+        if (accessToken != null) {
+            registerBlacklist(accessToken, "logout");
+        }
 
-        // 남은 유효 시간이 존재할 경우에만 블랙리스트에 추가
+        log.info("로그아웃 완료: {}", user.getUsername());
+    }
+
+    public void withdraw(User principal, String accessToken) {
+        if (principal == null) {
+            throw new UnauthorizedException("로그인이 필요합니다.");
+        }
+
+        // ✅ [핵심 수정] 컨트롤러에서 받은 User는 JWT에서 만든 '껍데기'입니다.
+        // provider, access_token 등의 정보를 얻기 위해 DB에서 '진짜 유저'를 다시 조회합니다.
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new TokenNotFoundException("사용자 정보를 찾을 수 없습니다."));
+
+        log.info("회원 탈퇴 프로세스 시작: username={}, provider={}", user.getUsername(), user.getProvider());
+
+        // 1. 소셜 플랫폼 연동 해제 (이제 user.getProvider()가 null이 아닙니다!)
+        socialUnlinkService.unlink(
+                user.getProvider(),
+                user.getProviderId(),
+                user.getProviderAccessToken(),
+                user.getProviderRefreshToken()
+        );
+
+        // 2. DB 삭제 (Soft Delete)
+        userRepository.delete(user);
+
+        // 3. 블랙리스트 등록
+        if (accessToken != null) {
+            registerBlacklist(accessToken, "withdraw");
+        }
+
+        log.info("회원 탈퇴 처리 완료 (DB Soft Delete + Social Unlink + Blacklist)");
+    }
+
+    // 블랙리스트 등록 공통 로직
+    private void registerBlacklist(String accessToken, String value) {
+        long remainingMillis = jwtTokenProvider.getRemainingTime(accessToken);
         if (remainingMillis > 0) {
             redisTemplate.opsForValue().set(
                     "blacklist:" + accessToken,
-                    "logout",
-                    remainingMillis, // ✅ 이제 올바른 값이 들어갑니다.
+                    value,
+                    remainingMillis,
                     TimeUnit.MILLISECONDS
             );
-            log.info("✅ AccessToken 블랙리스트 등록 완료: {} (유효기간 {}ms)", accessToken, remainingMillis);
-        } else {
-            log.warn("이미 만료된 AccessToken에 대한 로그아웃 요청입니다: {}", accessToken);
+            log.info("Access Token 블랙리스트 등록: {} (만료까지 {}ms)", value, remainingMillis);
         }
+    }
+
+    // 블랙리스트 확인 로직
+    private boolean isBlacklisted(String accessToken) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey("blacklist:" + accessToken));
     }
 }

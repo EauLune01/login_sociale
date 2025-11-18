@@ -100,6 +100,14 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
+app:
+  oauth2:
+    # 로컬 테스트할 땐 이거 (html 파일)
+    redirect-uri: /auth/callback.html
+
+    # 나중에 리액트(Next.js)랑 붙일 땐 이걸로 주석 해제해서 사용!
+    # redirect-uri: http://localhost:3000/auth/callback
+
 logging:
   level:
     org:

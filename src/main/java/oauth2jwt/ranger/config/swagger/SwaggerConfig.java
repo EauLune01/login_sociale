@@ -1,4 +1,4 @@
-package oauth2jwt.ranger.config.api.swagger;
+package oauth2jwt.ranger.config.swagger;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.security.SecurityScheme;

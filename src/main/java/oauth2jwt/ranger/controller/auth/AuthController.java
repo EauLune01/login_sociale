@@ -32,7 +32,7 @@ public class AuthController {
     @Operation(
             summary = "Access Token 재발급",
             description = "만료된 Access Token과 Refresh Token을 함께 보내 새로운 토큰들을 발급받습니다.",
-            security = {} // Swagger 문서에서 보안 요구 제거
+            security = {}
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "토큰 재발급 성공"),
@@ -43,57 +43,79 @@ public class AuthController {
     })
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<TokenResponse>> refreshToken(
-            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = JwtConstants.HEADER_STRING, required = false) String authHeader,
             @Valid @RequestBody RefreshTokenRequest request) {
 
-        String accessToken = null;
-        if (authorization != null && authorization.startsWith("Bearer ")) {
-            accessToken = authorization.substring(7);
-        }
+        String accessToken = extractAccessToken(authHeader);
 
-        TokenResponse tokenResponse = authService.reissueTokens(
-                accessToken, request.getRefreshToken()
-                );
+        TokenResponse tokenResponse = authService.reissueTokens(accessToken, request.getRefreshToken());
 
         return ResponseEntity.ok(
                 new ApiResponse<>(true, 200, "토큰이 성공적으로 재발급되었습니다.", tokenResponse)
         );
     }
 
-
+    // =================================================================
+    // 🚪 로그아웃
+    // =================================================================
     @Operation(
             summary = "로그아웃",
             description = "현재 로그인된 사용자를 로그아웃 처리하고 Refresh Token을 무효화합니다.",
-            security = { @SecurityRequirement(name = "bearerAuth") } // 🔒 Swagger에서 JWT 인증 필요
+            security = { @SecurityRequirement(name = "bearerAuth") }
     )
     @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "로그아웃 성공",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Access Token이 유효하지 않아 인증 실패",
-                    content = @Content(schema = @Schema(implementation = ApiResponse.class))
-            )
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 실패")
     })
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
             @AuthenticationPrincipal User loginUser,
             @RequestHeader(value = JwtConstants.HEADER_STRING, required = false) String authHeader
     ) {
-        // ✅ Access Token 추출
-        String accessToken = null;
-        if (authHeader != null && authHeader.startsWith(JwtConstants.TOKEN_PREFIX)) {
-            accessToken = authHeader.substring(JwtConstants.TOKEN_PREFIX.length());
-        }
+        String accessToken = extractAccessToken(authHeader);
 
-        // ✅ 로그아웃 처리 (DB RefreshToken 삭제 + Redis 블랙리스트 등록)
         authService.logout(loginUser, accessToken);
 
         return ResponseEntity.ok(
                 new ApiResponse<>(true, HttpStatus.OK.value(), "성공적으로 로그아웃되었습니다.")
         );
+    }
+
+    // =================================================================
+    // 💀 회원 탈퇴
+    // =================================================================
+    @Operation(
+            summary = "회원 탈퇴",
+            description = "계정을 삭제하고, 소셜 연동을 끊으며, 현재 토큰을 차단(로그아웃)합니다.",
+            security = { @SecurityRequirement(name = "bearerAuth") }
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "회원 탈퇴 성공") // ✅ 204로 변경
+    })
+    @DeleteMapping("/withdraw")
+    public ResponseEntity<ApiResponse<Void>> withdraw(
+            @AuthenticationPrincipal User loginUser,
+            @RequestHeader(value = JwtConstants.HEADER_STRING, required = false) String authHeader
+    ) {
+        String accessToken = extractAccessToken(authHeader);
+
+        authService.withdraw(loginUser, accessToken);
+
+        // 204 No Content 반환
+        return ResponseEntity
+                .status(HttpStatus.NO_CONTENT)
+                .body(new ApiResponse<>(true, HttpStatus.NO_CONTENT.value(), "성공적으로 회원 탈퇴 처리되었습니다.", null));
+    }
+
+    // =================================================================
+    // 🛠️ Private Helper Methods
+    // =================================================================
+
+    // "Bearer " 접두사를 제거하고 토큰만 추출하는 공통 메서드
+    private String extractAccessToken(String authHeader) {
+        if (authHeader != null && authHeader.startsWith(JwtConstants.TOKEN_PREFIX)) {
+            return authHeader.substring(JwtConstants.TOKEN_PREFIX.length());
+        }
+        return null;
     }
 }
