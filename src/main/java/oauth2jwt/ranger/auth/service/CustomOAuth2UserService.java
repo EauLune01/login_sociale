@@ -67,7 +67,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         return new CustomOAuth2User(user, oAuth2UserInfo.getAttributes());
     }
 
-    // 요청하신 대로 프로필 사진 없이 딱 이것만!
     private User saveNewUser(OAuth2UserInfo oAuth2UserInfo, String accessToken, String refreshToken) {
         String username = oAuth2UserInfo.getProvider() + "_" + oAuth2UserInfo.getProviderId();
 
