@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import oauth2jwt.ranger.auth.CustomOAuth2User;
 import oauth2jwt.ranger.auth.jwt.JwtConstants;
 import oauth2jwt.ranger.domain.user.User;
 import oauth2jwt.ranger.dto.auth.request.RefreshTokenRequest;
@@ -69,9 +70,11 @@ public class AuthController {
     })
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal User loginUser,
+            @AuthenticationPrincipal CustomOAuth2User customOAuth2User,
             @RequestHeader(value = JwtConstants.HEADER_STRING, required = false) String authHeader
     ) {
+
+        User loginUser = (customOAuth2User != null) ? customOAuth2User.getUser() : null;
         String accessToken = extractAccessToken(authHeader);
 
         authService.logout(loginUser, accessToken);
@@ -94,9 +97,11 @@ public class AuthController {
     })
     @DeleteMapping("/withdraw")
     public ResponseEntity<ApiResponse<Void>> withdraw(
-            @AuthenticationPrincipal User loginUser,
+            @AuthenticationPrincipal CustomOAuth2User customOAuth2User,
             @RequestHeader(value = JwtConstants.HEADER_STRING, required = false) String authHeader
     ) {
+        User loginUser = (customOAuth2User != null) ? customOAuth2User.getUser() : null;
+
         String accessToken = extractAccessToken(authHeader);
 
         authService.withdraw(loginUser, accessToken);
